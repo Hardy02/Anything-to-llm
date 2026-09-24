@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chat With a Book</title>
+  <meta name="description" content="Upload a book and ask a local AI about it. Retrieval-augmented generation that runs entirely in your browser.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="rag.css?v=3">
+</head>
+<body>
+  <nav class="site-nav wrap">
+    <a href="index.html">🎲 Build a tiny LLM</a>
+    <a href="rag.html" aria-current="page">📚 Chat with a book (real AI)</a>
+  </nav>
+
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Chat with a book <span class="arrow">→</span> RAG</h1>
+      <p class="tagline">Upload a book and ask questions about it. A small AI model runs <strong>in your browser</strong>. Before each answer, the page finds the 3 passages that best match your question and gives only those to the AI. This is called <em>retrieval-augmented generation</em> (RAG).</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="rag-steps">
+      <!-- STEP 1: MODEL -->
+      <section class="card" id="model-card">
+        <div class="card-head">
+          <span class="step">1</span>
+          <h2>Load the AI</h2>
+        </div>
+        <div class="field">
+          <label for="model-select">Model</label>
+          <select id="model-select"></select>
+        </div>
+        <p class="setting-help" id="model-help">The first time, the model downloads once (about 0.3–1.8 GB) and is saved in your browser for next time.</p>
+        <button class="btn primary" id="load-btn">Download &amp; start</button>
+        <div class="progress hidden" id="model-progress">
+          <div class="progress-track"><div class="progress-fill" id="model-progress-fill"></div></div>
+          <div class="progress-label" id="model-progress-label"></div>
+        </div>
+        <div class="notice hidden" id="gpu-notice"></div>
+        <div class="status" id="model-status"></div>
+      </section>
+
+      <!-- STEP 2: BOOK -->
+      <section class="card" id="book-card">
+        <div class="card-head">
+          <span class="step">2</span>
+          <h2>Upload a book</h2>
+        </div>
+        <label class="dropzone" id="book-drop">
+          <input type="file" id="book-input" accept=".txt,text/plain" multiple>
+          <span class="dz-icon">📖</span>
+          <span class="dz-main">Drop .txt files here or click to choose</span>
+          <span class="dz-sub">Big books are fine. The text stays on your device.</span>
+        </label>
+        <p class="hint">Free books: <a href="https://www.gutenberg.org/" target="_blank" rel="noopener">Project Gutenberg</a>. Choose "Plain Text UTF-8".</p>
+        <div class="progress hidden" id="book-progress">
+          <div class="progress-track"><div class="progress-fill" id="book-progress-fill"></div></div>
+          <div class="progress-label" id="book-progress-label"></div>
+        </div>
+        <div class="status" id="book-status"></div>
+      </section>
+    </div>
+
+    <!-- STEP 3: CHAT -->
+    <section class="card" id="rag-chat-card">
+      <div class="card-head">
+        <span class="step">3</span>
+        <h2>Ask about it</h2>
+        <button class="btn ghost small" id="rag-clear" title="Clear the conversation">Clear</button>
+      </div>
+      <div class="chat-log rag-log" id="rag-log" aria-live="polite">
+        <div class="empty-chat" id="rag-empty">
+          Load the AI and upload a book, then ask a question.<br>
+          <span class="muted">Example: "Who is the main character?" or "What happens at the end?"</span>
+        </div>
+      </div>
+      <form class="chat-form" id="rag-form">
+        <input type="text" id="rag-input" placeholder="Ask a question about the book…" autocomplete="off" disabled>
+        <button class="btn primary" type="submit" id="rag-send" disabled>Send</button>
+        <button class="btn ghost hidden" type="button" id="rag-stop">Stop</button>
+      </form>
+      <p class="setting-help" id="rag-hint">Each answer has a "Sources" section. Open it to see the passages the AI was given.</p>
+    </section>
+
+    <section class="card explainer">
+      <div class="card-head">
+        <span class="step">?</span>
+        <h2>How it works</h2>
+      </div>
+      <div class="explain-grid">
+        <div>
+          <h3>1. Cut the book into chunks</h3>
+          <p>The book is split by paragraph into chunks of about 60–200 words. A small AI can't read a whole book at once. This model can read about 4,000 tokens, which is roughly 3,000 words.</p>
+        </div>
+        <div>
+          <h3>2. Search the chunks</h3>
+          <p>When you ask a question, every chunk gets a score with <strong>BM25</strong>, an improved version of TF-IDF. Rare words from your question, like names, count for more than common words. The top 3 chunks win.</p>
+        </div>
+        <div>
+          <h3>3. Add them to a hidden prompt</h3>
+          <p>A hidden instruction is sent before your question: <em>"Answer ONLY using the following text snippets. If the answer is not in the text, say you do not know."</em> The 3 chunks come after it.</p>
+        </div>
+        <div>
+          <h3>4. Stream the answer</h3>
+          <p>The model runs on your graphics card with <strong>WebGPU</strong>, in a background worker. It predicts one token at a time, and each token appears as soon as it is ready.</p>
+        </div>
+        <div>
+          <h3>Why can it get things wrong?</h3>
+          <p>If the search misses the right passage, the AI can't see it. Try the character's name or other exact words from the book. Small models also make mistakes sometimes, so check the sources.</p>
+        </div>
+        <div>
+          <h3>What do I need?</h3>
+          <p>A browser with WebGPU, such as a recent Chrome or Edge on a computer. The first download is large. After that, it works offline from your browser's cache.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer muted">
+    Powered by <a href="https://github.com/mlc-ai/web-llm" target="_blank" rel="noopener">WebLLM</a>. Your book and your questions never leave your device.
+  </footer>
+
+  <script type="module" src="rag.js?v=3"></script>
+</body>
+</html>

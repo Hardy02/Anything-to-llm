@@ -1,6 +1,9 @@
 # Anything → LLM
 
-Turn any text into a tiny language model you can chat with. It is a fun way to learn how large language models work.
+The site has two pages:
+
+- **Build a tiny LLM** (`index.html`): turn any text into a tiny language model you can chat with. It is a fun way to learn how large language models work.
+- **Chat with a book** (`rag.html`): upload a book and ask a real AI about it. A small AI model runs in your browser with [WebLLM](https://github.com/mlc-ai/web-llm), and the page uses retrieval-augmented generation (RAG).
 
 **Live site:** https://hardy02.github.io/Anything-to-llm/ (after GitHub Pages is turned on, see below)
 
@@ -37,14 +40,31 @@ Everything runs in your browser, in a Web Worker. Your text is never uploaded.
 - It applies temperature to the counts: `p ∝ count^(1/T)`.
 - In chat mode, it continues from the end of your message if it has seen those words. If it hasn't, it starts from the rarest word in your message that it knows.
 
+## Chat with a book (RAG)
+
+1. **Load the AI.** Pick a model (Llama 3.2 1B by default, or Qwen 2.5 0.5B, or Llama 3.2 3B). `rag-worker.js` is a module Web Worker. It calls `CreateMLCEngine` from `@mlc-ai/web-llm`, so downloading the model and generating text never freeze the page. The model is cached in the browser after the first download. If the GPU has no `shader-f16` support, the page uses the `q4f32` version of the model.
+2. **Upload a book.** The page reads `.txt` files with `FileReader`, removes Project Gutenberg licence text, and splits the book into chunks of 60–200 words. It splits by paragraph, cuts long paragraphs between sentences, and joins short ones.
+3. **Search.** `search.js` builds a BM25 index, a stronger version of TF-IDF. It uses stopwords and a small stemmer, and gives a bonus to chunks that contain more of the question's words. It finds the top 3 chunks for each question. A 1-million-word book indexes in about a second.
+4. **RAG prompt.** The page builds a hidden system prompt: *"You are a helpful assistant. Answer the user's question ONLY using the following text snippets. If the answer is not in the text, say you do not know."*, followed by the 3 chunks. It also sends the last 2 question/answer pairs, so follow-up questions work.
+5. **Streaming.** The answer appears token by token, and a **Stop** button can interrupt it. Under each answer, **Sources** shows the passages the AI was given, with matching words highlighted. It also shows the hidden prompt.
+
+The AI needs a browser with **WebGPU**, such as a recent Chrome or Edge on a computer. Without WebGPU, the page still works as a search engine: questions show the best matching passages.
+
+`rag.html` uses `<script type="module">` and a module worker, so it must be served over HTTP (GitHub Pages is fine). It does not work from `file://`. To test it on your computer, run `python3 -m http.server` and open `http://localhost:8000/rag.html`.
+
 ## Files
 
 - `index.html`: the page
 - `style.css`: the styles (light and dark mode)
 - `app.js`: the UI and the model (the model runs in a Web Worker made from a Blob)
 - `samples.js`: the built-in sample texts
+- `rag.html`, `rag.css`, `rag.js`: the "Chat with a book" page
+- `search.js`: chunking and BM25 search (an ES module with no dependencies)
+- `rag-worker.js`: the Web Worker that runs WebLLM (`@mlc-ai/web-llm@0.2.85`, loaded from the jsDelivr CDN)
 
-There is no build step and there are no dependencies.
+Script and style links end in `?v=N`. When you change these files, increase `N`, so that browsers don't keep old cached copies next to a new `index.html`.
+
+There is no build step, no Node.js, and no bundler.
 
 ## Turn on GitHub Pages
 
