@@ -1,0 +1,49 @@
+/* Extra styles for rag.html. Builds on style.css. */
+.site-nav { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 16px; }
+.site-nav a {
+  text-decoration: none; color: var(--text); font-size: .9rem;
+  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+}
+.site-nav a[aria-current="page"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 600; }
+.site-nav + .site-header { padding-top: 24px; }
+
+.rag-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 20px; }
+
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.field label { font-weight: 600; font-size: .9rem; }
+select {
+  font: inherit; padding: 9px 12px; border-radius: 10px; width: 100%;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+#model-card .btn { margin-top: 10px; }
+
+.notice {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: .9rem;
+  background: var(--p-mid); color: var(--text);
+}
+.status { margin-top: 10px; font-size: .92rem; }
+.ok { color: #1f9d55; font-weight: 700; }
+.bad { color: #d0452f; font-weight: 700; }
+
+.rag-log { height: 520px; }
+@media (max-width: 860px) { .rag-log { height: 420px; } }
+.msg.bot .answer { white-space: pre-wrap; }
+.cursor {
+  display: inline-block; width: .55em; height: 1.05em; vertical-align: text-bottom;
+  background: var(--accent); margin-left: 1px; animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+#rag-stop { flex: none; }
+
+.sources { margin-top: 10px; font-size: .88rem; border-top: 1px solid var(--border); padding-top: 8px; }
+.sources > summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.source { margin-top: 8px; padding: 8px 10px; background: var(--surface-2); border-radius: 8px; }
+.source-head { font-size: .76rem; color: var(--muted); margin-bottom: 4px; }
+.source-text { white-space: pre-wrap; }
+.source mark { background: var(--p-mid); color: inherit; border-radius: 3px; padding: 0 1px; }
+.prompt { margin-top: 8px; }
+.prompt summary { cursor: pointer; color: var(--muted); }
+.prompt pre {
+  white-space: pre-wrap; font: 12px/1.45 var(--mono); background: var(--surface-2);
+  padding: 10px; border-radius: 8px; max-height: 260px; overflow: auto;
+}

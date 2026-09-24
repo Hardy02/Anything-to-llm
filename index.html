@@ -6,9 +6,15 @@
   <title>Anything to LLM</title>
   <meta name="description" content="Turn any text into a tiny language model you can chat with, and see how next-word prediction works.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="rag.css?v=3">
 </head>
 <body>
+  <nav class="site-nav wrap">
+    <a href="index.html" aria-current="page">🎲 Build a tiny LLM</a>
+    <a href="rag.html">📚 Chat with a book (real AI)</a>
+  </nav>
+
   <header class="site-header">
     <div class="wrap">
       <h1>Anything <span class="arrow">→</span> LLM</h1>
@@ -50,7 +56,7 @@
       </div>
 
       <div class="train-bar">
-        <div class="counter" id="word-counter">0 / 1,000,000 words</div>
+        <div class="counter" id="word-counter">0 / 50,000,000 words</div>
         <label class="check"><input type="checkbox" id="keep-lines"> Keep single line breaks (good for poems, lyrics, scripts)</label>
         <button class="btn primary" id="train-btn" disabled>Build my model</button>
       </div>
@@ -168,8 +174,8 @@
     Made for fun and for learning. Your text never leaves your device.
   </footer>
 
-  <script src="samples.js"></script>
-  <script src="model.js"></script>
-  <script src="app.js"></script>
+  <script src="samples.js?v=3"></script>
+  <script src="model.js?v=3"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
