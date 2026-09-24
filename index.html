@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Anything to LLM</title>
+  <meta name="description" content="Turn any text into a tiny language model you can chat with, and see how next-word prediction works.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Anything <span class="arrow">→</span> LLM</h1>
+      <p class="tagline">A language model is a machine that guesses the next word. Give it some text, and it learns which words tend to follow which. Then you can chat with it.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- STEP 1: TRAIN -->
+    <section class="card" id="train-card">
+      <div class="card-head">
+        <span class="step">1</span>
+        <h2>Give it something to read</h2>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" data-tab="paste" aria-selected="true">Type or paste</button>
+        <button class="tab" role="tab" data-tab="upload" aria-selected="false">Upload .txt</button>
+        <button class="tab" role="tab" data-tab="sample" aria-selected="false">Use a sample</button>
+      </div>
+
+      <div class="tab-panel" data-panel="paste">
+        <textarea id="text-input" spellcheck="false" placeholder="Paste a book, song lyrics, your group chat, a Wikipedia article, anything. More text makes a better model. Up to 1,000,000 words."></textarea>
+      </div>
+
+      <div class="tab-panel hidden" data-panel="upload">
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".txt,.md,.csv,.srt,text/plain" multiple>
+          <span class="dz-icon">📄</span>
+          <span class="dz-main">Drop .txt files here or click to choose</span>
+          <span class="dz-sub">You can pick more than one file. They are joined together. Nothing is uploaded to a server; everything stays in your browser.</span>
+        </label>
+        <ul id="file-list" class="file-list"></ul>
+        <p class="hint">Tip: <a href="https://www.gutenberg.org/" target="_blank" rel="noopener">Project Gutenberg</a> has thousands of free books as plain text.</p>
+      </div>
+
+      <div class="tab-panel hidden" data-panel="sample">
+        <div class="samples" id="samples"></div>
+      </div>
+
+      <div class="train-bar">
+        <div class="counter" id="word-counter">0 / 1,000,000 words</div>
+        <label class="check"><input type="checkbox" id="keep-lines"> Keep single line breaks (good for poems, lyrics, scripts)</label>
+        <button class="btn primary" id="train-btn" disabled>Build my model</button>
+      </div>
+
+      <div class="progress hidden" id="progress">
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label" id="progress-label">Starting…</div>
+      </div>
+
+      <div class="stats hidden" id="stats"></div>
+    </section>
+
+    <!-- STEP 2: CHAT -->
+    <section class="card disabled" id="chat-card">
+      <div class="card-head">
+        <span class="step">2</span>
+        <h2>Chat with it</h2>
+        <button class="btn ghost small" id="clear-chat" title="Clear the conversation">Clear</button>
+      </div>
+
+      <div class="chat-layout">
+        <div class="chat-col">
+          <div class="chat-log" id="chat-log" aria-live="polite">
+            <div class="empty-chat" id="empty-chat">
+              Build a model first. Then say something to it.<br>
+              <span class="muted">Tip: click any word in a reply to see why the model picked it.</span>
+            </div>
+          </div>
+          <form class="chat-form" id="chat-form">
+            <input type="text" id="chat-input" placeholder="Say something…" autocomplete="off" disabled>
+            <button class="btn primary" type="submit" id="send-btn" disabled>Send</button>
+          </form>
+          <div class="legend" id="legend">
+            <span class="legend-label">Word colour = how sure the model was:</span>
+            <span class="tok-demo p-hi">sure</span>
+            <span class="tok-demo p-mid">some options</span>
+            <span class="tok-demo p-lo">a gamble</span>
+          </div>
+        </div>
+
+        <aside class="side-col">
+          <div class="panel">
+            <h3>Settings</h3>
+            <div class="setting">
+              <label for="order">Memory <span class="val" id="order-val">3 words</span></label>
+              <input type="range" id="order" min="1" max="6" value="3">
+              <p class="setting-help">How many previous words it looks at to guess the next one. Low: nonsense. High: copies your text word for word.</p>
+            </div>
+            <div class="setting">
+              <label for="temp">Creativity <span class="val" id="temp-val">1.0</span></label>
+              <input type="range" id="temp" min="0" max="20" value="10">
+              <p class="setting-help">This is called <em>temperature</em>. 0 always picks the most likely word. Higher values give rare words more of a chance.</p>
+            </div>
+            <div class="setting">
+              <label for="length">Reply length <span class="val" id="length-val">Medium</span></label>
+              <input type="range" id="length" min="1" max="3" value="2">
+            </div>
+            <label class="check"><input type="checkbox" id="avoid-copy"> Avoid copying (use less memory when there is only one option)</label>
+            <label class="check"><input type="checkbox" id="animate" checked> Type out replies word by word</label>
+            <label class="check"><input type="checkbox" id="color-toks" checked> Colour words by probability</label>
+          </div>
+
+          <div class="panel" id="inspector">
+            <h3>Look inside</h3>
+            <div id="inspector-body" class="inspector-empty">Click a word in one of the model's replies to see the choices it had.</div>
+          </div>
+
+          <div class="panel">
+            <h3>Be the model</h3>
+            <p class="setting-help">Type a few words. See what the model thinks comes next. Click a word to add it.</p>
+            <input type="text" id="explore-input" placeholder="e.g. once upon a" autocomplete="off" disabled>
+            <div id="explore-out" class="explore-out"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- EXPLAINER -->
+    <section class="card explainer">
+      <div class="card-head">
+        <span class="step">?</span>
+        <h2>What is happening here?</h2>
+      </div>
+      <div class="explain-grid">
+        <div>
+          <h3>1. Cut the text into tokens</h3>
+          <p>Your text is split into small pieces called <strong>tokens</strong>. Here a token is a word or a punctuation mark. Real LLMs use pieces of words, for example <code>un</code> + <code>believ</code> + <code>able</code>.</p>
+        </div>
+        <div>
+          <h3>2. Count what comes next</h3>
+          <p>For every run of words in your text, the model remembers which word came next. If you set memory to 2 words, it asks: "After <em>the old</em>, what did I see?" Maybe <em>man</em> 5 times and <em>house</em> 2 times.</p>
+        </div>
+        <div>
+          <h3>3. Turn counts into probabilities</h3>
+          <p>5 out of 7 is about 71%, so <em>man</em> has a 71% chance and <em>house</em> has a 29% chance. This is a <strong>probability distribution</strong> over the next token.</p>
+        </div>
+        <div>
+          <h3>4. Roll the dice, then repeat</h3>
+          <p>The model picks one word at random using those chances. Then it adds that word to the text and does it again. One word at a time, a reply appears. Real LLMs work the same way.</p>
+        </div>
+        <div>
+          <h3>What if it has never seen this?</h3>
+          <p>If it never saw your exact words, it <strong>backs off</strong>: it forgets the oldest word and tries again with fewer words. Click a word in a reply to see how many words of memory it used.</p>
+        </div>
+        <div>
+          <h3>So how is ChatGPT different?</h3>
+          <p>This model can only repeat patterns it saw exactly. A real LLM is a neural network with billions of learned numbers. It reads thousands of tokens of context, not 6. It learns meaning, so it can guess well for sentences it never saw. It is also trained on a large part of the internet, and then taught to be a helpful assistant. But the basic job is the same: <strong>predict the next token</strong>.</p>
+        </div>
+      </div>
+      <p class="technical muted">Technical note: this is a word-level <em>n-gram</em> model with "stupid backoff". It is built on a suffix array of your text, so any memory length from 1 to 6 works without rebuilding. Everything runs in your browser.</p>
+    </section>
+  </main>
+
+  <footer class="wrap footer muted">
+    Made for fun and for learning. Your text never leaves your device.
+  </footer>
+
+  <script src="samples.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
