@@ -31,7 +31,7 @@
       </div>
 
       <div class="tab-panel" data-panel="paste">
-        <textarea id="text-input" spellcheck="false" placeholder="Paste a book, song lyrics, your group chat, a Wikipedia article, anything. More text makes a better model. Up to 1,000,000 words."></textarea>
+        <textarea id="text-input" spellcheck="false" placeholder="Paste a book, song lyrics, your group chat, a Wikipedia article, anything. More text makes a better model. Up to 50 million words. For really big texts, use Upload."></textarea>
       </div>
 
       <div class="tab-panel hidden" data-panel="upload">
@@ -39,7 +39,7 @@
           <input type="file" id="file-input" accept=".txt,.md,.csv,.srt,text/plain" multiple>
           <span class="dz-icon">📄</span>
           <span class="dz-main">Drop .txt files here or click to choose</span>
-          <span class="dz-sub">You can pick more than one file. They are joined together. Nothing is uploaded to a server; everything stays in your browser.</span>
+          <span class="dz-sub">You can pick more than one file. They are joined together. Big files (hundreds of MB) are fine: they are read piece by piece. Nothing is uploaded to a server; everything stays in your browser.</span>
         </label>
         <ul id="file-list" class="file-list"></ul>
         <p class="hint">Tip: <a href="https://www.gutenberg.org/" target="_blank" rel="noopener">Project Gutenberg</a> has thousands of free books as plain text.</p>
@@ -96,8 +96,8 @@
             <h3>Settings</h3>
             <div class="setting">
               <label for="order">Memory <span class="val" id="order-val">3 words</span></label>
-              <input type="range" id="order" min="1" max="6" value="3">
-              <p class="setting-help">How many previous words it looks at to guess the next one. Low: nonsense. High: copies your text word for word.</p>
+              <input type="range" id="order" min="0" max="16" value="2">
+              <p class="setting-help">How many previous words it looks at to guess the next one. Low: nonsense. High: copies your text word for word. "Unlimited" uses the longest match it can find.</p>
             </div>
             <div class="setting">
               <label for="temp">Creativity <span class="val" id="temp-val">1.0</span></label>
@@ -106,7 +106,7 @@
             </div>
             <div class="setting">
               <label for="length">Reply length <span class="val" id="length-val">Medium</span></label>
-              <input type="range" id="length" min="1" max="3" value="2">
+              <input type="range" id="length" min="1" max="4" value="2">
             </div>
             <label class="check"><input type="checkbox" id="avoid-copy"> Avoid copying (use less memory when there is only one option)</label>
             <label class="check"><input type="checkbox" id="animate" checked> Type out replies word by word</label>
@@ -157,10 +157,10 @@
         </div>
         <div>
           <h3>So how is ChatGPT different?</h3>
-          <p>This model can only repeat patterns it saw exactly. A real LLM is a neural network with billions of learned numbers. It reads thousands of tokens of context, not 6. It learns meaning, so it can guess well for sentences it never saw. It is also trained on a large part of the internet, and then taught to be a helpful assistant. But the basic job is the same: <strong>predict the next token</strong>.</p>
+          <p>This model can only repeat patterns it saw exactly. A real LLM is a neural network with billions of learned numbers. It can read thousands of tokens of context at once and work out how they relate, instead of only looking for the longest exact match. It learns meaning, so it can guess well for sentences it never saw. It is also trained on a large part of the internet, and then taught to be a helpful assistant. But the basic job is the same: <strong>predict the next token</strong>.</p>
         </div>
       </div>
-      <p class="technical muted">Technical note: this is a word-level <em>n-gram</em> model with "stupid backoff". It is built on a suffix array of your text, so any memory length from 1 to 6 works without rebuilding. Everything runs in your browser.</p>
+      <p class="technical muted">Technical note: this is a word-level <em>n-gram</em> model with backoff. With unlimited memory it becomes an "∞-gram" model. The model sorts every position in your text by the words that follow it, into a <em>suffix array</em>. It builds the array with prefix doubling and radix sort. With the array, it can find any run of words, of any length, with a binary search. So you can change the memory length without rebuilding. It uses about 8 bytes per token after building, and everything runs in your browser.</p>
     </section>
   </main>
 
@@ -169,6 +169,7 @@
   </footer>
 
   <script src="samples.js"></script>
+  <script src="model.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

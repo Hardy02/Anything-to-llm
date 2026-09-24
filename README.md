@@ -6,8 +6,8 @@ Turn any text into a tiny language model you can chat with. It is a fun way to l
 
 ## What it does
 
-1. You type or paste text, upload one or more `.txt` files, or pick a built-in sample. You can use up to 1,000,000 words.
-2. The site splits the text into tokens and counts which token comes after each run of 1–6 tokens.
+1. You type or paste text, upload one or more `.txt` files, or pick a built-in sample. You can use up to **50,000,000 words**. Uploaded files are read piece by piece, so files of hundreds of MB work.
+2. The site splits the text into tokens and builds an index that can find every run of words in it, of any length.
 3. You chat with it. It picks each next word at random, using the probabilities from those counts, just like an LLM predicts the next token.
 
 To learn more, you can:
@@ -15,14 +15,25 @@ To learn more, you can:
 - **Click any word in a reply** to see the words the model looked at, the options it had, and the chance of each one.
 - **Colour by probability**: see which words were near-certain and which were a gamble.
 - **Be the model**: type a few words and see the next-word probabilities live. Click a word to add it.
-- Change **Memory** (n-gram order), **Creativity** (temperature) and **Avoid copying** to see how the output changes.
+- Change **Memory** (from 1 word up to 1,024 words, or **Unlimited**), **Creativity** (temperature) and **Avoid copying** to see how the output changes.
 
 Everything runs in your browser, in a Web Worker. Your text is never uploaded.
 
 ## How it works (technical)
 
-- Word-level n-gram model with "stupid backoff" (orders 1–6).
-- The model builds a suffix array over the token sequence. This means one sort handles every context length, and memory use stays small (about 8 bytes per token). One million words builds in a few seconds.
+- Word-level n-gram model with backoff. With **Unlimited** memory it is an "∞-gram" model: it always uses the longest recent run of words that appears somewhere in the text.
+- The model builds a suffix array over the token sequence, using prefix doubling with radix sort, sorted to a depth of 1,024 tokens. It stops early when every position is unique. A binary search then finds any context. It also uses binary search to find the longest matching context, because a match for k words means there is also a match for k−1.
+- After building, it keeps about 8 bytes per token. The peak during building is about 24 bytes per token.
+- Input is streamed: files are decoded in chunks (`File.stream()` + `TextDecoderStream`) inside the worker, and tokens go straight into a growing `Int32Array`.
+- Build times in headless Chromium, on a worst-case text with long repeated passages:
+
+  | Words | Build time |
+  |------:|-----------:|
+  | 5M    | about 7 s  |
+  | 25M   | about 46 s |
+  | 50M   | about 106 s |
+
+  Normal prose usually builds faster, because most positions become unique within a few words. Phones have less memory, so they may not manage the largest texts.
 - It applies temperature to the counts: `p ∝ count^(1/T)`.
 - In chat mode, it continues from the end of your message if it has seen those words. If it hasn't, it starts from the rarest word in your message that it knows.
 
