@@ -12,6 +12,7 @@
 <body>
   <nav class="site-nav wrap">
     <a href="index.html" aria-current="page">🎲 Build a tiny LLM</a>
+    <a href="train.html">🧠 Train a neural LLM (advanced)</a>
     <a href="rag.html">📚 Chat with a book (real AI)</a>
   </nav>
 
@@ -163,7 +164,7 @@
         </div>
         <div>
           <h3>So how is ChatGPT different?</h3>
-          <p>This model can only repeat patterns it saw exactly. A real LLM is a neural network with billions of learned numbers. It can read thousands of tokens of context at once and work out how they relate, instead of only looking for the longest exact match. It learns meaning, so it can guess well for sentences it never saw. It is also trained on a large part of the internet, and then taught to be a helpful assistant. But the basic job is the same: <strong>predict the next token</strong>.</p>
+          <p>This model can only repeat patterns it saw exactly. A real LLM is a neural network with billions of learned numbers. It can read thousands of tokens of context at once and work out how they relate, instead of only looking for the longest exact match. It learns meaning, so it can guess well for sentences it never saw. It is also trained on a large part of the internet, and then taught to be a helpful assistant. But the basic job is the same: <strong>predict the next token</strong>. Want to train a real neural network yourself? Try <a href="train.html">Train a neural LLM</a>.</p>
         </div>
       </div>
       <p class="technical muted">Technical note: this is a word-level <em>n-gram</em> model with backoff. With unlimited memory it becomes an "∞-gram" model. The model sorts every position in your text by the words that follow it, into a <em>suffix array</em>. It builds the array with prefix doubling and radix sort. With the array, it can find any run of words, of any length, with a binary search. So you can change the memory length without rebuilding. It uses about 8 bytes per token after building, and everything runs in your browser.</p>

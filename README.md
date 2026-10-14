@@ -1,8 +1,9 @@
 # Anything → LLM
 
-The site has two pages:
+The site has three pages:
 
 - **Build a tiny LLM** (`index.html`): turn any text into a tiny language model you can chat with. It is a fun way to learn how large language models work.
+- **Train a neural LLM** (`train.html`, advanced): train a real transformer, like GPT, from scratch in your browser. You see tokenization, the cross-entropy loss, gradient descent, compression and distillation.
 - **Chat with a book** (`rag.html`): upload a book and ask a real AI about it. A small AI model runs in your browser with [WebLLM](https://github.com/mlc-ai/web-llm), and the page uses retrieval-augmented generation (RAG).
 
 **Live site:** https://hardy02.github.io/Anything-to-llm/ (after GitHub Pages is turned on, see below)
@@ -40,6 +41,22 @@ Everything runs in your browser, in a Web Worker. Your text is never uploaded.
 - It applies temperature to the counts: `p ∝ count^(1/T)`.
 - In chat mode, it continues from the end of your message if it has seen those words. If it hasn't, it starts from the rarest word in your message that it knows.
 
+## Train a neural LLM (advanced)
+
+This page builds a model the way real language models are built:
+
+1. **Tokenize.** Pick single characters, or byte-pair encoding (BPE) subwords like GPT, with a vocabulary of 256 to 4,096 tokens. BPE starts with characters and keeps joining the most common pair of neighbouring tokens. The text is split 90% for training and 10% for validation.
+2. **Design the network.** A decoder-only transformer like GPT-2: token and position embeddings, then blocks of LayerNorm → causal multi-head self-attention → residual → LayerNorm → MLP (GELU) → residual, then a final LayerNorm and an output layer that shares weights with the token embeddings. You choose the layers, width, heads and context length.
+3. **Pre-train.** The loss is the cross-entropy: the average of −log₂ p(the real next token), in bits per token. Every layer has a hand-written backward pass (backpropagation, based on [llm.c](https://github.com/karpathy/llm.c)). The optimiser is AdamW with warm-up, cosine decay and gradient clipping. A live chart shows the training and validation loss against baselines: a uniform guess, token counts with no context, and gzip.
+4. **Compression.** The validation loss is also the size the model could compress new text to (with arithmetic coding). The page compares it with gzip, and with the "zipping" trick from *Language Trees and Zipping* (gzip after reading the training text). "See the loss, token by token" colours each token by its information, −log₂ p.
+5. **Generate** with temperature and top-k. Click a token to see the full distribution, its information in bits, and the entropy.
+6. **Distill** the model into a smaller student. The student learns the teacher's whole distribution, with cross-entropy H(teacher, student) or KL divergence as the loss (and an optional temperature τ). You can also train the same student with no teacher, to compare. The chart shows cross-entropy, KL divergence and the teacher's entropy: KL = cross-entropy − entropy. Both losses give the same gradient.
+7. **Save or load** a model as a JSON file (settings, tokenizer and weights).
+
+The page ends with a lesson with interactive widgets: the robot example (codes of −log₂ q bits, cross-entropy as the area of a diagram, KL divergence as wasted bits), the two-outcome plot that shows the minimum of cross-entropy is the entropy, at q = p, and a gzip "language trees and zipping" experiment.
+
+Everything runs on the CPU in a Web Worker (`nn-model.js`), with no libraries. On a laptop, the Tiny preset (about 137,000 weights) takes a fraction of a second per step. A neural network needs more text than the counting model: a whole book (hundreds of thousands of characters) gives much better results than the built-in samples, which it soon memorises.
+
 ## Chat with a book (RAG)
 
 1. **Load the AI.** Pick a model (Llama 3.2 1B by default, or Qwen 2.5 0.5B, or Llama 3.2 3B). `rag-worker.js` is a module Web Worker. It calls `CreateMLCEngine` from `@mlc-ai/web-llm`, so downloading the model and generating text never freeze the page. The model is cached in the browser after the first download. If the GPU has no `shader-f16` support, the page uses the `q4f32` version of the model.
@@ -58,6 +75,8 @@ The AI needs a browser with **WebGPU**, such as a recent Chrome or Edge on a com
 - `style.css`: the styles (light and dark mode)
 - `app.js`: the UI and the model (the model runs in a Web Worker made from a Blob)
 - `samples.js`: the built-in sample texts
+- `train.html`, `train.css`, `train.js`: the "Train a neural LLM" page and its lesson widgets
+- `nn-model.js`: the tokenizer, the transformer (forward and backward passes), AdamW, training, distillation and generation. It runs in a Web Worker made from a Blob, like `model.js`
 - `rag.html`, `rag.css`, `rag.js`: the "Chat with a book" page
 - `search.js`: chunking and BM25 search (an ES module with no dependencies)
 - `rag-worker.js`: the Web Worker that runs WebLLM (`@mlc-ai/web-llm@0.2.85`, loaded from the jsDelivr CDN)
