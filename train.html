@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Train a Neural LLM</title>
+  <meta name="description" content="Train a real transformer language model from scratch in your browser: tokens, cross-entropy loss, backpropagation, gradient descent, compression and distillation.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="rag.css?v=3">
+  <link rel="stylesheet" href="train.css?v=1">
+</head>
+<body>
+  <nav class="site-nav wrap">
+    <a href="index.html">🎲 Build a tiny LLM</a>
+    <a href="train.html" aria-current="page">🧠 Train a neural LLM (advanced)</a>
+    <a href="rag.html">📚 Chat with a book (real AI)</a>
+  </nav>
+
+  <header class="site-header">
+    <div class="wrap">
+      <h1>Train a neural LLM <span class="arrow">→</span> the real way</h1>
+      <p class="tagline">This page trains a small <strong>transformer</strong>, the same kind of model as GPT, from random numbers. It cuts text into tokens, measures how surprised the model is by each next token (the <strong>cross-entropy loss</strong>), and uses <strong>backpropagation</strong> and <strong>gradient descent</strong> to make it less surprised. Then you can <strong>distill</strong> it into a smaller model. Everything runs on your computer, in your browser.</p>
+      <p class="tagline small-tag">New to this? <a href="#lesson">Read the lesson on cross-entropy and compression</a> first, or just start below.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- STEP 1: DATA + TOKENIZER -->
+    <section class="card" id="data-card">
+      <div class="card-head">
+        <span class="step">1</span>
+        <h2>Give it text, and cut it into tokens</h2>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" role="tab" data-tab="paste" aria-selected="true">Type or paste</button>
+        <button class="tab" role="tab" data-tab="upload" aria-selected="false">Upload .txt</button>
+        <button class="tab" role="tab" data-tab="sample" aria-selected="false">Use a sample</button>
+      </div>
+
+      <div class="tab-panel" data-panel="paste">
+        <textarea id="text-input" spellcheck="false" placeholder="Paste a book, song lyrics, code, anything. A neural network needs more text than the counting model: 100,000 characters or more works best. Up to 20 million characters."></textarea>
+      </div>
+      <div class="tab-panel hidden" data-panel="upload">
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="file-input" accept=".txt,.md,.csv,.srt,.js,.py,text/plain" multiple>
+          <span class="dz-icon">📄</span>
+          <span class="dz-main">Drop .txt files here or click to choose</span>
+          <span class="dz-sub">Files are joined together. The first 20 million characters are used. Nothing is uploaded.</span>
+        </label>
+        <ul id="file-list" class="file-list"></ul>
+        <p class="hint">Tip: a whole book from <a href="https://www.gutenberg.org/" target="_blank" rel="noopener">Project Gutenberg</a> ("Plain Text UTF-8") is a good size.</p>
+      </div>
+      <div class="tab-panel hidden" data-panel="sample">
+        <div class="samples" id="samples"></div>
+        <p class="hint">The samples are small, so the model will memorise them (you will see this as a gap between the training and validation loss). For real results, upload a book.</p>
+      </div>
+
+      <div class="grid-2 tok-settings">
+        <div class="field">
+          <label for="tok-kind">Tokenizer</label>
+          <select id="tok-kind">
+            <option value="bpe" selected>Subwords (byte-pair encoding, like GPT)</option>
+            <option value="char">Single characters</option>
+          </select>
+        </div>
+        <div class="field" id="vocab-field">
+          <label for="vocab-size">Vocabulary size</label>
+          <select id="vocab-size">
+            <option value="256">256 tokens</option>
+            <option value="512" selected>512 tokens</option>
+            <option value="1024">1,024 tokens</option>
+            <option value="2048">2,048 tokens</option>
+            <option value="4096">4,096 tokens</option>
+          </select>
+        </div>
+      </div>
+      <p class="setting-help">Byte-pair encoding starts with single characters, then keeps joining the pair of neighbouring tokens that is most common, until the vocabulary is full. Common words become one token; rare words are split into pieces. A bigger vocabulary means fewer tokens per text, but a bigger, slower output layer.</p>
+
+      <div class="train-bar">
+        <div class="counter" id="char-counter">0 characters</div>
+        <label class="check hidden" id="reuse-wrap"><input type="checkbox" id="reuse-tok"> Keep the current model and its tokenizer (train it on this new text)</label>
+        <button class="btn primary" id="tokenize-btn" disabled>Tokenize</button>
+      </div>
+      <div class="progress hidden" id="tok-progress">
+        <div class="progress-track"><div class="progress-fill" id="tok-progress-fill"></div></div>
+        <div class="progress-label" id="tok-progress-label"></div>
+      </div>
+      <div class="stats hidden" id="tok-stats"></div>
+    </section>
+
+    <!-- STEP 2: ARCHITECTURE -->
+    <section class="card disabled" id="arch-card">
+      <div class="card-head">
+        <span class="step">2</span>
+        <h2>Design the neural network</h2>
+      </div>
+      <div class="presets" id="arch-presets"></div>
+      <div class="grid-4">
+        <div class="field"><label for="a-layers">Layers (transformer blocks)</label><select id="a-layers"></select></div>
+        <div class="field"><label for="a-width">Width (numbers per token)</label><select id="a-width"></select></div>
+        <div class="field"><label for="a-heads">Attention heads</label><select id="a-heads"></select></div>
+        <div class="field"><label for="a-ctx">Context (tokens it can see)</label><select id="a-ctx"></select></div>
+      </div>
+      <div class="arch-summary" id="arch-summary"></div>
+      <div class="train-bar">
+        <button class="btn primary" id="create-btn" disabled>Create model (random weights)</button>
+      </div>
+      <div class="stats hidden" id="create-stats"></div>
+    </section>
+
+    <!-- STEP 3: PRE-TRAIN -->
+    <section class="card disabled" id="train-card">
+      <div class="card-head">
+        <span class="step">3</span>
+        <h2>Pre-train it: gradient descent on the cross-entropy loss</h2>
+      </div>
+      <div class="grid-5">
+        <div class="field"><label for="t-steps">Steps</label><input type="number" id="t-steps" min="1" max="100000" value="500"></div>
+        <div class="field"><label for="t-batch">Batch size</label><select id="t-batch"><option>4</option><option>8</option><option selected>16</option><option>32</option></select></div>
+        <div class="field"><label for="t-lr">Learning rate</label><select id="t-lr"><option value="0.0003">0.0003</option><option value="0.001">0.001</option><option value="0.002">0.002</option><option value="0.003" selected>0.003</option><option value="0.006">0.006</option></select></div>
+        <div class="field"><label for="t-warmup">Warm-up steps</label><input type="number" id="t-warmup" min="0" max="10000" value="30"></div>
+        <div class="field"><label for="t-wd">Weight decay</label><select id="t-wd"><option value="0">0</option><option value="0.01">0.01</option><option value="0.1" selected>0.1</option></select></div>
+      </div>
+      <p class="setting-help">Each step takes a <em>batch</em> of random pieces of the training text. For every position, the model gives a probability to every possible next token. The loss is the average of −log₂(probability of the token that really came next). Backpropagation finds how each weight changes the loss, and the AdamW optimiser moves every weight a little bit downhill. The learning rate warms up, then slowly drops (cosine schedule).</p>
+      <div class="train-bar">
+        <button class="btn primary" id="train-btn" disabled>Start training</button>
+        <button class="btn ghost hidden" id="pause-btn">Pause</button>
+        <span class="muted small" id="train-eta"></span>
+      </div>
+      <div class="progress hidden" id="train-progress">
+        <div class="progress-track"><div class="progress-fill" id="train-progress-fill"></div></div>
+        <div class="progress-label" id="train-progress-label"></div>
+      </div>
+
+      <div class="train-grid">
+        <div>
+          <div class="chart-wrap">
+            <canvas id="loss-chart" height="300" aria-label="Loss curve"></canvas>
+          </div>
+          <div class="chart-legend" id="loss-legend"></div>
+        </div>
+        <div class="stat-col" id="train-tiles"></div>
+      </div>
+
+      <div class="compress hidden" id="compress-box"></div>
+
+      <details class="panel analysis-panel" id="analysis-panel">
+        <summary><strong>See the loss, token by token</strong> <span class="muted">(how surprised the model is by each real next token)</span></summary>
+        <p class="setting-help">Each token is coloured by its <em>information</em> from the model's point of view: −log₂ p, where p is the chance the model gave it before seeing it. Blue tokens were expected (few bits); red tokens were a surprise (many bits). The loss is the average over all tokens. Leave the box empty to use the start of the validation text, which the model never trained on.</p>
+        <textarea id="analysis-input" class="short" spellcheck="false" placeholder="(optional) type your own text to score"></textarea>
+        <div class="train-bar">
+          <select id="analysis-which" class="inline-select"><option value="teacher">Pre-trained model</option><option value="student" disabled>Distilled student</option></select>
+          <button class="btn ghost small" id="analysis-btn" disabled>Score this text</button>
+          <span class="muted small" id="analysis-summary"></span>
+        </div>
+        <div class="surprise" id="analysis-out"></div>
+        <div class="inspector-empty" id="analysis-detail">Click a token to see what the model expected instead.</div>
+      </details>
+    </section>
+
+    <!-- STEP 4: GENERATE -->
+    <section class="card disabled" id="gen-card">
+      <div class="card-head">
+        <span class="step">4</span>
+        <h2>Generate text</h2>
+        <button class="btn ghost small" id="gen-clear" title="Clear the output">Clear</button>
+      </div>
+      <div class="chat-layout">
+        <div class="chat-col">
+          <div class="gen-out" id="gen-out"><span class="muted">Train the model for a while, then type the start of some text and press Generate. You can generate while it is still training, to watch it learn.</span></div>
+          <form class="chat-form" id="gen-form">
+            <input type="text" id="gen-input" placeholder="Start of the text (or leave empty)…" autocomplete="off" disabled>
+            <button class="btn primary" type="submit" id="gen-btn" disabled>Generate</button>
+            <button class="btn ghost hidden" type="button" id="gen-stop">Stop</button>
+          </form>
+          <div class="legend">
+            <span class="legend-label">Colour = how sure the model was:</span>
+            <span class="tok-demo p-hi">sure</span>
+            <span class="tok-demo p-mid">some options</span>
+            <span class="tok-demo p-lo">a gamble</span>
+          </div>
+        </div>
+        <aside class="side-col">
+          <div class="panel">
+            <h3>Settings</h3>
+            <div class="field">
+              <label for="gen-which">Model</label>
+              <select id="gen-which"><option value="teacher">Pre-trained model</option><option value="student" disabled>Distilled student</option></select>
+            </div>
+            <div class="setting">
+              <label for="gen-temp">Temperature <span class="val" id="gen-temp-val">0.8</span></label>
+              <input type="range" id="gen-temp" min="0" max="20" value="8">
+              <p class="setting-help">0 always picks the most likely token. 1 samples from the model's real beliefs. Higher is wilder.</p>
+            </div>
+            <div class="setting">
+              <label for="gen-topk">Top-k <span class="val" id="gen-topk-val">off</span></label>
+              <input type="range" id="gen-topk" min="0" max="6" value="0">
+              <p class="setting-help">Only pick from the k most likely tokens.</p>
+            </div>
+            <div class="setting">
+              <label for="gen-len">Length <span class="val" id="gen-len-val">200 tokens</span></label>
+              <input type="range" id="gen-len" min="1" max="8" value="4">
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Look inside</h3>
+            <div id="gen-inspector" class="inspector-empty">Click a generated token to see the probability distribution the model gave.</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- STEP 5: DISTILL -->
+    <section class="card disabled" id="distill-card">
+      <div class="card-head">
+        <span class="step">5</span>
+        <h2>Distill it into a smaller model</h2>
+      </div>
+      <p class="setting-help card-intro">In <strong>distillation</strong>, a small <em>student</em> model learns from the big <em>teacher</em> you just trained. Instead of only learning the one token that really came next, the student learns the teacher's whole probability distribution, using the cross-entropy between the two distributions as its loss. That gives it much more information per token.</p>
+      <div class="presets" id="student-presets"></div>
+      <div class="grid-5">
+        <div class="field"><label for="s-layers">Student layers</label><select id="s-layers"></select></div>
+        <div class="field"><label for="s-width">Student width</label><select id="s-width"></select></div>
+        <div class="field"><label for="s-heads">Student heads</label><select id="s-heads"></select></div>
+        <div class="field"><label for="d-steps">Steps</label><input type="number" id="d-steps" min="1" max="100000" value="300"></div>
+        <div class="field"><label for="d-tau">Temperature τ</label><select id="d-tau"><option value="1" selected>1</option><option value="2">2</option><option value="4">4</option></select></div>
+      </div>
+      <fieldset class="radio-group">
+        <legend>Loss function</legend>
+        <label><input type="radio" name="d-mode" value="ce" checked> <strong>Cross-entropy with the teacher</strong> H(p<sub>teacher</sub>, q<sub>student</sub>)</label>
+        <label><input type="radio" name="d-mode" value="kl"> <strong>KL divergence from the teacher</strong> D<sub>KL</sub>(p<sub>teacher</sub> ‖ q<sub>student</sub>)</label>
+        <label><input type="radio" name="d-mode" value="hard"> <strong>No teacher</strong>: normal pre-training on the real next tokens (for comparison)</label>
+      </fieldset>
+      <p class="setting-help" id="d-arch-summary"></p>
+      <div class="train-bar">
+        <button class="btn primary" id="distill-btn" disabled>Start distilling</button>
+        <button class="btn ghost hidden" id="dpause-btn">Pause</button>
+        <span class="muted small" id="distill-eta"></span>
+      </div>
+      <div class="progress hidden" id="distill-progress">
+        <div class="progress-track"><div class="progress-fill" id="distill-progress-fill"></div></div>
+        <div class="progress-label" id="distill-progress-label"></div>
+      </div>
+      <div class="train-grid">
+        <div>
+          <div class="chart-wrap"><canvas id="distill-chart" height="300" aria-label="Distillation loss curve"></canvas></div>
+          <div class="chart-legend" id="distill-legend"></div>
+        </div>
+        <div class="stat-col" id="distill-tiles"></div>
+      </div>
+      <div class="runs hidden" id="distill-runs"></div>
+    </section>
+
+    <!-- STEP 6: SAVE -->
+    <section class="card disabled" id="save-card">
+      <div class="card-head">
+        <span class="step">6</span>
+        <h2>Save or load a model</h2>
+      </div>
+      <p class="setting-help card-intro">A model is just its settings, its tokenizer, and a long list of numbers (the weights). Download it to keep it, and load it later to generate text or to keep training.</p>
+      <div class="train-bar">
+        <button class="btn ghost" id="save-teacher" disabled>Download pre-trained model</button>
+        <button class="btn ghost" id="save-student" disabled>Download student</button>
+        <label class="btn ghost file-btn">Load a model file<input type="file" id="load-model" accept=".json,application/json"></label>
+        <span class="muted small" id="save-status"></span>
+      </div>
+    </section>
+
+    <!-- LESSON -->
+    <section class="card explainer" id="lesson">
+      <div class="card-head">
+        <span class="step">?</span>
+        <h2>The lesson: cross-entropy, compression and training</h2>
+      </div>
+
+      <div class="lesson-part">
+        <h3>1. Information: rare things cost more bits</h3>
+        <p>Imagine sending instructions to a far-away robot: <strong>up, down, left, right</strong>. If "up" is sent half of the time, "down" a quarter of the time, and "left" and "right" an eighth each, the best code uses <code>0</code> for up, <code>10</code> for down, and <code>110</code> and <code>111</code> for left and right. Each symbol costs <strong>−log₂(its probability)</strong> bits: 1, 2, 3 and 3. Claude Shannon called this number the <em>information</em> of an event. It is how many times you must halve 1 to get down to the probability. The average, Σ p·(−log₂ p), is the <strong>entropy</strong>: the best possible number of bits per symbol.</p>
+      </div>
+
+      <div class="lesson-part">
+        <h3>2. Cross-entropy: using a code made for the wrong world</h3>
+        <p>Now the plan changes: right is sent half of the time, left a quarter, up and down an eighth each. The robot still uses the old code. The average cost becomes a weighted sum: the <em>new</em> probabilities p times the <em>old</em> code lengths −log₂ q. That sum, <strong>H(p, q) = Σ pᵢ · (−log₂ qᵢ)</strong>, is the <strong>cross-entropy</strong>. In the diagram, each bar's width is pᵢ and its height is −log₂ qᵢ, so the total area is the cross-entropy. The dashed outline is the best you could do, the entropy of p.</p>
+        <div class="ce-widget" id="ce-widget"></div>
+      </div>
+
+      <div class="lesson-part">
+        <h3>3. The key fact: the minimum is when q = p</h3>
+        <p>Keep the real world p fixed and change the code q. Cross-entropy is lowest when q is exactly p, and that lowest value is the entropy of p. Move the slider to change p. The purple curve is H(p, q) for every q; the green curve traces where its minimum goes, which is the entropy.</p>
+        <div class="two-widget" id="two-widget"></div>
+      </div>
+
+      <div class="lesson-part">
+        <h3>4. Why this trains language models</h3>
+        <p>A language model is a function: it reads tokens and gives a probability q to every possible next token. For each position in the training text we look at the token that <em>really</em> came next and take −log₂ q(that token): how surprised the model was. The loss is the average. That is the cross-entropy between the true patterns of language (p, as sampled by the text) and the model (q). Because cross-entropy is smallest when q = p, pushing the loss down with gradient descent pushes the model's beliefs towards the real patterns of language. The loss can never go below the entropy of the text itself.</p>
+        <p><strong>It is also compression.</strong> With a technique called arithmetic coding, a model that gives probability q to each next token can store the text in about Σ −log₂ q bits. So the loss in bits per token is exactly how well the model would compress the text. Training a language model is training a compressor. That is why step 3 compares your model with <strong>gzip</strong>: once its validation loss drops below gzip's line, your neural network is a better compressor of new text than gzip.</p>
+      </div>
+
+      <div class="lesson-part">
+        <h3>5. Language trees and zipping</h3>
+        <p>A 2002 paper, <em>Language Trees and Zipping</em>, found which languages are related using only gzip. Take two texts A and B. Add a small piece b of B to the end of A, and compress. The extra bytes tell you how well a compressor tuned to A handles b: a rough, practical estimate of cross-entropy. If b is like A, it costs few extra bytes. Try it with the samples (or your own text):</p>
+        <div class="zip-widget" id="zip-widget"></div>
+      </div>
+
+      <div class="lesson-part">
+        <h3>6. Distillation and KL divergence</h3>
+        <p>When you distill a big model into a small one, the "true" distribution p is the teacher's whole prediction, not just one real token. The student's loss is the cross-entropy H(p<sub>teacher</sub>, q<sub>student</sub>). The difference between cross-entropy and its smallest possible value is the <strong>Kullback–Leibler (KL) divergence</strong>: D<sub>KL</sub>(p ‖ q) = H(p, q) − H(p). It is the number of bits per symbol you <em>waste</em> by using a code made for q. For the robot, that is 2.625 − 1.75 = 0.875 bits. It is 0 when q = p and grows as they differ, but it is not symmetric: D<sub>KL</sub>(p ‖ q) ≠ D<sub>KL</sub>(q ‖ p).</p>
+        <details class="puzzle">
+          <summary>Puzzle 1: show that Σ pᵢ log(pᵢ / qᵢ) is the same as H(p, q) − H(p).</summary>
+          <p>log(pᵢ / qᵢ) = −log qᵢ − (−log pᵢ). Multiply by pᵢ and add up: Σ pᵢ(−log qᵢ) − Σ pᵢ(−log pᵢ) = H(p, q) − H(p). The short form hides that it is a difference of two averages.</p>
+        </details>
+        <details class="puzzle">
+          <summary>Puzzle 2: how does the diagram show the KL divergence?</summary>
+          <p>In the cross-entropy diagram, each bar has width pᵢ. Its height is −log₂ qᵢ, and the dashed outline is at −log₂ pᵢ. The gap between them is log₂(pᵢ / qᵢ), so the total area of the gaps (counting gaps below the outline as negative) is Σ pᵢ log₂(pᵢ / qᵢ), the KL divergence. It is never negative in total, even though single bars can be.</p>
+        </details>
+        <details class="puzzle">
+          <summary>Puzzle 3: what happens if you distill with the KL divergence instead of cross-entropy?</summary>
+          <p>Nothing changes in the training. KL = cross-entropy − H(p<sub>teacher</sub>), and the teacher's entropy does not depend on the student's weights. So both losses have exactly the same gradient, and gradient descent makes exactly the same steps. Only the number you see is different: KL reaches 0 when the student matches the teacher perfectly, while cross-entropy bottoms out at the teacher's entropy. Try it in step 5: run once with each loss, and compare the student's curves.</p>
+        </details>
+      </div>
+
+      <div class="lesson-part">
+        <h3>What is inside this model?</h3>
+        <p>A decoder-only transformer, like GPT-2: token and position embeddings, then a stack of blocks. Each block has LayerNorm, causal multi-head self-attention (each token looks back at earlier tokens), a residual connection, LayerNorm, a two-layer MLP with GELU, and another residual connection. A final LayerNorm and an output layer (sharing weights with the token embeddings) give one score per vocabulary token, and softmax turns the scores into probabilities. Every layer has a hand-written backward pass, based on Andrej Karpathy's <a href="https://github.com/karpathy/llm.c" target="_blank" rel="noopener">llm.c</a>. The optimiser is AdamW (β₁ = 0.9, β₂ = 0.95) with gradient clipping at 1.0. It runs on your CPU in a Web Worker, so it is small: real LLMs use the same recipe with billions of weights, trillions of tokens and thousands of GPUs.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer muted">
+    Made for learning. Your text and your model never leave your device.
+  </footer>
+
+  <script src="samples.js?v=3"></script>
+  <script src="nn-model.js?v=1"></script>
+  <script src="train.js?v=1"></script>
+</body>
+</html>
